@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+
+# Virtualenv / Poetry
+.venv/
+poetry.lock
+
+# Data and outputs
+data/
+outputs/
+plots/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# System
+.DS_Store

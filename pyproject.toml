@@ -1,0 +1,24 @@
+[project]
+name = "prot-bert-finetune"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "kirill.morozov"}
+]
+readme = "README.md"
+requires-python = ">=3.11, <3.14"
+dependencies = [
+    "torch (>=2.8.0,<3.0.0)",
+    "transformers (>=4.56.0,<5.0.0)",
+    "pandas (>=2.3.2,<3.0.0)",
+    "numpy (>=2.3.2,<3.0.0)",
+    "mlflow (>=3.3.2,<4.0.0)",
+    "onnx (>=1.19.0,<2.0.0)",
+    "onnxruntime (>=1.22.1,<2.0.0)",
+    "tqdm (>=4.67.1,<5.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
