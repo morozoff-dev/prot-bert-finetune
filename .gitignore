@@ -7,15 +7,20 @@ __pycache__/
 
 # Virtualenv / Poetry
 .venv/
-poetry.lock
-
-# Data and outputs
-data/
-outputs/
-plots/
+*.egg-info/
 
 # Jupyter
 .ipynb_checkpoints/
 
-# System
+# IDE/OS
 .DS_Store
+.vscode/
+.idea/
+
+# Data & outputs
+data/
+outputs/
+plots/
+
+# Logs
+*.log
