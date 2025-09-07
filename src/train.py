@@ -2,17 +2,18 @@ import os
 
 import numpy as np
 import pandas as pd
-from transformers import AutoTokenizer
 import wandb
+from transformers import AutoTokenizer
 
 from conf.config import CFG
 from src.preprocessing import add_cv_folds, preprocess_train_data
 from src.trainer import train_loop
 from src.utils import LOGGER, get_score
 
+
 def get_result(oof_df):
     """
-    Подсчёт финального CV score. 
+    Подсчёт финального CV score.
     """
     pred_cols = [f"pred_{c}" for c in CFG.target_cols]
     mask = ~np.any(oof_df[pred_cols].isna().values, axis=1)
@@ -20,7 +21,7 @@ def get_result(oof_df):
         LOGGER.info("[DEBUG] Skip scoring: no complete predictions yet")
         return
     labels = oof_df.loc[mask, CFG.target_cols].values
-    preds  = oof_df.loc[mask, pred_cols].values
+    preds = oof_df.loc[mask, pred_cols].values
     score, scores = get_score(labels, preds)
     LOGGER.info(f"Score: {score:<.4f}  Scores: {scores}  (on {mask.sum()} rows)")
 
@@ -30,9 +31,9 @@ def main():
     raw_csv = "data/all_train_data_v17.csv"
     if not os.path.exists(raw_csv):
         raise FileNotFoundError(f"Не найден {raw_csv}")
-    
+
     tokenizer = AutoTokenizer.from_pretrained(CFG.model)
-    tokenizer.save_pretrained(CFG.path+'tokenizer/')
+    tokenizer.save_pretrained(CFG.path + "tokenizer/")
     CFG.tokenizer = tokenizer
 
     train = preprocess_train_data(
@@ -65,6 +66,7 @@ def main():
 
     if CFG.wandb:
         wandb.finish()
+
 
 if __name__ == "__main__":
     main()

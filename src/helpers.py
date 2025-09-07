@@ -1,5 +1,6 @@
-import time
 import math
+import time
+
 import numpy as np
 import torch
 import wandb
@@ -9,12 +10,12 @@ from conf.config import CFG
 
 def prepare_input(cfg, text):
     inputs = cfg.tokenizer.encode_plus(
-        text, 
-        return_tensors=None, 
-        add_special_tokens=True, 
+        text,
+        return_tensors=None,
+        add_special_tokens=True,
         max_length=cfg.max_len,
-        padding='max_length',
-        truncation=True
+        padding="max_length",
+        truncation=True,
     )
     for k, v in inputs.items():
         inputs[k] = torch.tensor(v, dtype=torch.long)
@@ -23,13 +24,14 @@ def prepare_input(cfg, text):
 
 def collate(inputs):
     mask_len = int(inputs["attention_mask"].sum(axis=1).max())
-    for k, v in inputs.items():
-        inputs[k] = inputs[k][:,:mask_len]
+    for k, _v in inputs.items():
+        inputs[k] = inputs[k][:, :mask_len]
     return inputs
 
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
+
     def __init__(self):
         self.reset()
 
@@ -49,7 +51,7 @@ class AverageMeter(object):
 def asMinutes(s):
     m = math.floor(s / 60)
     s -= m * 60
-    return '%dm %ds' % (m, s)
+    return "%dm %ds" % (m, s)
 
 
 def timeSince(since, percent):
@@ -57,33 +59,35 @@ def timeSince(since, percent):
     s = now - since
     es = s / (percent)
     rs = es - s
-    return '%s (remain %s)' % (asMinutes(s), asMinutes(rs))
+    return "%s (remain %s)" % (asMinutes(s), asMinutes(rs))
 
 
 def train_fn(fold, train_loader, model, criterion, optimizer, epoch, scheduler, device):
     model.train()
     scaler = torch.cuda.amp.GradScaler(enabled=CFG.apex)
     losses = AverageMeter()
-    start = end = time.time()
+    start = time.time()
     global_step = 0
     for step, (inputs1, inputs2, position, labels) in enumerate(train_loader):
-        #inputs1 = collate(inputs1)
+        # inputs1 = collate(inputs1)
         for k, v in inputs1.items():
             inputs1[k] = v.to(device)
-        #inputs2 = collate(inputs2)
+        # inputs2 = collate(inputs2)
         for k, v in inputs2.items():
             inputs2[k] = v.to(device)
         position = position.to(device)
         labels = labels.to(device)
         batch_size = labels.size(0)
         with torch.cuda.amp.autocast(enabled=CFG.apex):
-            y_preds = model(inputs1,inputs2,position)
+            y_preds = model(inputs1, inputs2, position)
             loss = criterion(y_preds, labels)
         if CFG.gradient_accumulation_steps > 1:
             loss = loss / CFG.gradient_accumulation_steps
         losses.update(loss.item(), batch_size)
         scaler.scale(loss).backward()
-        grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), CFG.max_grad_norm)
+        grad_norm = torch.nn.utils.clip_grad_norm_(
+            model.parameters(), CFG.max_grad_norm
+        )
         if (step + 1) % CFG.gradient_accumulation_steps == 0:
             scaler.step(optimizer)
             scaler.update()
@@ -91,26 +95,34 @@ def train_fn(fold, train_loader, model, criterion, optimizer, epoch, scheduler, 
             global_step += 1
             if CFG.batch_scheduler:
                 scheduler.step()
-        end = time.time()
-        if step % CFG.print_freq == 0 or step == (len(train_loader)-1):
-            print('Epoch: [{0}][{1}/{2}] '
-                  'Elapsed {remain:s} '
-                  'Loss: {loss.val:.4f}({loss.avg:.4f}) '
-                  'Grad: {grad_norm:.4f}  '
-                  'LR: {lr:.8f}  '
-                  .format(epoch+1, step, len(train_loader), 
-                          remain=timeSince(start, float(step+1)/len(train_loader)),
-                          loss=losses,
-                          grad_norm=grad_norm,
-                          lr=scheduler.get_lr()[0]))
+        if step % CFG.print_freq == 0 or step == (len(train_loader) - 1):
+            print(
+                "Epoch: [{0}][{1}/{2}] "
+                "Elapsed {remain:s} "
+                "Loss: {loss.val:.4f}({loss.avg:.4f}) "
+                "Grad: {grad_norm:.4f}  "
+                "LR: {lr:.8f}  ".format(
+                    epoch + 1,
+                    step,
+                    len(train_loader),
+                    remain=timeSince(start, float(step + 1) / len(train_loader)),
+                    loss=losses,
+                    grad_norm=grad_norm,
+                    lr=scheduler.get_lr()[0],
+                )
+            )
         if CFG.wandb:
-            wandb.log({f"[fold{fold}] loss": losses.val,
-                       f"[fold{fold}] lr": scheduler.get_lr()[0]})
-            
+            wandb.log(
+                {
+                    f"[fold{fold}] loss": losses.val,
+                    f"[fold{fold}] lr": scheduler.get_lr()[0],
+                }
+            )
+
         if CFG.fast_debug and (step + 1) >= CFG.debug_steps:
             print(f"[DEBUG] Остановлен ранний выход после {CFG.debug_steps} шагов")
             break
-        
+
     return losses.avg
 
 
@@ -119,9 +131,9 @@ def valid_fn(valid_loader, model, criterion, device):
     model.eval()
     preds = []
     n_seen = 0
-    start = end = time.time()
+    start = time.time()
     for step, (inputs1, inputs2, position, labels) in enumerate(valid_loader):
-        #inputs = collate(inputs)
+        # inputs = collate(inputs)
         for k, v in inputs1.items():
             inputs1[k] = v.to(device)
         for k, v in inputs2.items():
@@ -132,25 +144,30 @@ def valid_fn(valid_loader, model, criterion, device):
 
         batch_size = labels.size(0)
         with torch.no_grad():
-            y_preds = model(inputs1,inputs2,position)
+            y_preds = model(inputs1, inputs2, position)
             loss = criterion(y_preds, labels)
         if CFG.gradient_accumulation_steps > 1:
             loss = loss / CFG.gradient_accumulation_steps
         losses.update(loss.item(), batch_size)
-        preds.append(y_preds.to('cpu').numpy())
-        end = time.time()
+        preds.append(y_preds.to("cpu").numpy())
         n_seen += bs
 
-        if step % CFG.print_freq == 0 or step == (len(valid_loader)-1):
-            print('EVAL: [{0}/{1}] '
-                  'Elapsed {remain:s} '
-                  'Loss: {loss.val:.4f}({loss.avg:.4f}) '
-                  .format(step, len(valid_loader),
-                          loss=losses,
-                          remain=timeSince(start, float(step+1)/len(valid_loader))))
-        if getattr(CFG, 'fast_debug', False) and (step + 1) >= getattr(CFG, 'debug_val_steps', 1):
-                print(f"[DEBUG] valid early-exit after {step+1} steps (seen={n_seen})")
-                break
+        if step % CFG.print_freq == 0 or step == (len(valid_loader) - 1):
+            print(
+                "EVAL: [{0}/{1}] "
+                "Elapsed {remain:s} "
+                "Loss: {loss.val:.4f}({loss.avg:.4f}) ".format(
+                    step,
+                    len(valid_loader),
+                    loss=losses,
+                    remain=timeSince(start, float(step + 1) / len(valid_loader)),
+                )
+            )
+        if getattr(CFG, "fast_debug", False) and (step + 1) >= getattr(
+            CFG, "debug_val_steps", 1
+        ):
+            print(f"[DEBUG] valid early-exit after {step+1} steps (seen={n_seen})")
+            break
 
-    predictions = np.concatenate(preds, axis=0) if len(preds) else np.empty((0,1))
+    predictions = np.concatenate(preds, axis=0) if len(preds) else np.empty((0, 1))
     return losses.avg, predictions, n_seen

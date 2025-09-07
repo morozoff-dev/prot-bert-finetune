@@ -1,6 +1,6 @@
+import numpy as np
 import torch
 from torch.utils.data import Dataset
-import numpy as np
 
 from src.helpers import prepare_input
 
@@ -8,10 +8,10 @@ from src.helpers import prepare_input
 class TrainDataset(Dataset):
     def __init__(self, cfg, df):
         self.cfg = cfg
-        self.texts1 = df['sequence'].values
-        self.texts2 = df['mutant_seq'].values
+        self.texts1 = df["sequence"].values
+        self.texts2 = df["mutant_seq"].values
         self.labels = df[cfg.target_cols].values
-        self.position = df['position'].values
+        self.position = df["position"].values
 
     def __len__(self):
         return len(self.texts1)
@@ -29,9 +29,9 @@ class TrainDataset(Dataset):
 class TestDataset(Dataset):
     def __init__(self, cfg, df):
         self.cfg = cfg
-        self.texts1 = df['sequence'].values
-        self.texts2 = df['mutant_seq'].values
-        self.position = df['position'].values
+        self.texts1 = df["sequence"].values
+        self.texts2 = df["mutant_seq"].values
+        self.position = df["position"].values
 
     def __len__(self):
         return len(self.texts1)
@@ -43,4 +43,3 @@ class TestDataset(Dataset):
         position[self.position[item]] = 1
         position = torch.tensor(position, dtype=torch.int)
         return inputs1, inputs2, position
-    

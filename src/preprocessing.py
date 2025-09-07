@@ -25,7 +25,9 @@ def preprocess_train_data(
 
     # 1) фильтр по источнику
     if "source" in train.columns:
-        train = train.loc[train["source"].astype(str).str.contains(source_substr, na=False)]
+        train = train.loc[
+            train["source"].astype(str).str.contains(source_substr, na=False)
+        ]
         if verbose:
             print("After source filter:", train.shape)
 
@@ -49,10 +51,9 @@ def preprocess_train_data(
         tmp = train.loc[train["PDB"] == p, "dTm"]
         if tmp.isna().sum() > len(tmp) / 2:
             target_col = "ddG"
-        train.loc[train["PDB"] == p, "target"] = (
-            rankdata(train.loc[train["PDB"] == p, target_col]) /
-            len(train.loc[train["PDB"] == p, target_col])
-        )
+        train.loc[train["PDB"] == p, "target"] = rankdata(
+            train.loc[train["PDB"] == p, target_col]
+        ) / len(train.loc[train["PDB"] == p, target_col])
     train = train.reset_index(drop=True)
 
     if verbose:
@@ -61,11 +62,7 @@ def preprocess_train_data(
 
 
 def add_cv_folds(
-    train_df,
-    n_splits: int,
-    target_cols,
-    group_col: str = "PDB",
-    verbose: bool = False
+    train_df, n_splits: int, target_cols, group_col: str = "PDB", verbose: bool = False
 ):
     """
     Модифицирует train_df: добавляет столбец 'fold' (int) по GroupKFold.
@@ -73,7 +70,7 @@ def add_cv_folds(
     """
     Fold = GroupKFold(n_splits=n_splits)
     train_df = train_df.copy()
-    for n, (train_index, val_index) in enumerate(
+    for n, (_, val_index) in enumerate(
         Fold.split(train_df, train_df[target_cols], train_df[group_col])
     ):
         train_df.loc[val_index, "fold"] = int(n)

@@ -1,16 +1,18 @@
 import os
 import random
+from logging import INFO, FileHandler, Formatter, StreamHandler, getLogger
 
-from logging import getLogger, INFO, StreamHandler, FileHandler, Formatter
 import numpy as np
 import torch
 
 from conf.config import CFG
 
+
 def _rmse_np(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """RMSE без sklearn, с защитой от NaN."""
     diff = y_true - y_pred
     return float(np.sqrt(np.mean(np.square(diff), dtype=np.float64)))
+
 
 def MCRMSE(y_trues: np.ndarray, y_preds: np.ndarray):
     """
@@ -34,19 +36,22 @@ def MCRMSE(y_trues: np.ndarray, y_preds: np.ndarray):
         # маска валидных элементов (оба не NaN)
         mask = ~np.isnan(y_trues[:, i]) & ~np.isnan(y_preds[:, i])
         if mask.sum() == 0:
-            scores.append(np.nan)   # нет ни одной валидной строки для этой колонки
+            scores.append(np.nan)  # нет ни одной валидной строки для этой колонки
         else:
             scores.append(_rmse_np(y_trues[mask, i], y_preds[mask, i]))
 
     mcrmse = float(np.nanmean(scores))  # среднее по колонкам, игноря NaN
     return mcrmse, scores
 
+
 def get_score(y_trues: np.ndarray, y_preds: np.ndarray):
     mcrmse_score, scores = MCRMSE(y_trues, y_preds)
     return mcrmse_score, scores
 
 
-def get_logger(filename=CFG.path+'train'):  # только в трейне получается логгер используем
+def get_logger(
+    filename=CFG.path + "train",
+):  # только в трейне получается логгер используем
     logger = getLogger(__name__)
     logger.setLevel(INFO)
     handler1 = StreamHandler()
@@ -57,15 +62,17 @@ def get_logger(filename=CFG.path+'train'):  # только в трейне по�
     logger.addHandler(handler2)
     return logger
 
+
 LOGGER = get_logger()
 
 
 def seed_everything(seed=42):
     random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
-    
+
+
 seed_everything(seed=42)
