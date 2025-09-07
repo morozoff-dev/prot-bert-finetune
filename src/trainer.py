@@ -49,10 +49,6 @@ def train_loop(folds, fold):
     # ====================================================
     model = CustomModel(CFG, config_path=None, pretrained=True)
     torch.save(model.config, CFG.path +'config.pth')
-    INIT_CKPT = CFG.path + f"{CFG.model.replace('/', '-')}_fold{fold}_init.pth"
-    torch.save({'model': model.state_dict()}, INIT_CKPT)
-    LOGGER.info(f"Saved init checkpoint -> {INIT_CKPT}")
-
     
     # FREEZE LAYERS
     if CFG.num_freeze_blocks>0:
