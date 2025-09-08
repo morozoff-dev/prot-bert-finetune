@@ -18,7 +18,8 @@ __pycache__/
 .idea/
 
 # Data & outputs
-data/
+data/*
+!data/*.dvc
 outputs/
 plots/
 
