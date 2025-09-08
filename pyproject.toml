@@ -31,3 +31,6 @@ pre-commit = "^4.3.0"
 black = "^25.1.0"
 isort = "^6.0.1"
 flake8 = "^7.3.0"
+dvc = {extras = ["gdrive"], version = "^3.63.0"}
+cryptography = "<44"
+pydrive2 = "1.21.3"

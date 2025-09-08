@@ -20,8 +20,10 @@ __pycache__/
 # Data & outputs
 data/*
 !data/*.dvc
-outputs/
+outputs/*
+!outputs/best/*.dvc
 plots/
+gdrive-service.json
 
 # Logs
 *.log
