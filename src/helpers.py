@@ -4,16 +4,16 @@ import time
 import numpy as np
 import torch
 import wandb
-
-from conf.config import CFG
+from transformers import AutoTokenizer
 
 
 def prepare_input(cfg, text):
-    inputs = cfg.tokenizer.encode_plus(
+    tokenizer = AutoTokenizer.from_pretrained(cfg.model.tokenizer_dir)
+    inputs = tokenizer.encode_plus(
         text,
         return_tensors=None,
         add_special_tokens=True,
-        max_length=cfg.max_len,
+        max_length=cfg.training.max_len,
         padding="max_length",
         truncation=True,
     )
@@ -62,9 +62,11 @@ def timeSince(since, percent):
     return "%s (remain %s)" % (asMinutes(s), asMinutes(rs))
 
 
-def train_fn(fold, train_loader, model, criterion, optimizer, epoch, scheduler, device):
+def train_fn(
+    fold, train_loader, model, criterion, optimizer, epoch, scheduler, device, cfg
+):
     model.train()
-    scaler = torch.cuda.amp.GradScaler(enabled=CFG.apex)
+    scaler = torch.cuda.amp.GradScaler(enabled=cfg.logging.apex)
     losses = AverageMeter()
     start = time.time()
     global_step = 0
@@ -78,24 +80,24 @@ def train_fn(fold, train_loader, model, criterion, optimizer, epoch, scheduler, 
         position = position.to(device)
         labels = labels.to(device)
         batch_size = labels.size(0)
-        with torch.cuda.amp.autocast(enabled=CFG.apex):
+        with torch.cuda.amp.autocast(enabled=cfg.logging.apex):
             y_preds = model(inputs1, inputs2, position)
             loss = criterion(y_preds, labels)
-        if CFG.gradient_accumulation_steps > 1:
-            loss = loss / CFG.gradient_accumulation_steps
+        if cfg.training.gradient_accumulation_steps > 1:
+            loss = loss / cfg.training.gradient_accumulation_steps
         losses.update(loss.item(), batch_size)
         scaler.scale(loss).backward()
         grad_norm = torch.nn.utils.clip_grad_norm_(
-            model.parameters(), CFG.max_grad_norm
+            model.parameters(), cfg.training.max_grad_norm
         )
-        if (step + 1) % CFG.gradient_accumulation_steps == 0:
+        if (step + 1) % cfg.training.gradient_accumulation_steps == 0:
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
             global_step += 1
-            if CFG.batch_scheduler:
+            if cfg.model.batch_scheduler:
                 scheduler.step()
-        if step % CFG.print_freq == 0 or step == (len(train_loader) - 1):
+        if step % cfg.logging.print_freq == 0 or step == (len(train_loader) - 1):
             print(
                 "Epoch: [{0}][{1}/{2}] "
                 "Elapsed {remain:s} "
@@ -111,7 +113,7 @@ def train_fn(fold, train_loader, model, criterion, optimizer, epoch, scheduler, 
                     lr=scheduler.get_lr()[0],
                 )
             )
-        if CFG.wandb:
+        if cfg.logging.wandb:
             wandb.log(
                 {
                     f"[fold{fold}] loss": losses.val,
@@ -119,14 +121,16 @@ def train_fn(fold, train_loader, model, criterion, optimizer, epoch, scheduler, 
                 }
             )
 
-        if CFG.fast_debug and (step + 1) >= CFG.debug_steps:
-            print(f"[DEBUG] Остановлен ранний выход после {CFG.debug_steps} шагов")
+        if cfg.debug.fast_debug and (step + 1) >= cfg.debug.debug_steps:
+            print(
+                f"[DEBUG] Остановлен ранний выход после {cfg.debug.debug_steps} шагов"
+            )
             break
 
     return losses.avg
 
 
-def valid_fn(valid_loader, model, criterion, device):
+def valid_fn(valid_loader, model, criterion, device, cfg):
     losses = AverageMeter()
     model.eval()
     preds = []
@@ -146,13 +150,13 @@ def valid_fn(valid_loader, model, criterion, device):
         with torch.no_grad():
             y_preds = model(inputs1, inputs2, position)
             loss = criterion(y_preds, labels)
-        if CFG.gradient_accumulation_steps > 1:
-            loss = loss / CFG.gradient_accumulation_steps
+        if cfg.training.gradient_accumulation_steps > 1:
+            loss = loss / cfg.training.gradient_accumulation_steps
         losses.update(loss.item(), batch_size)
         preds.append(y_preds.to("cpu").numpy())
         n_seen += bs
 
-        if step % CFG.print_freq == 0 or step == (len(valid_loader) - 1):
+        if step % cfg.logging.print_freq == 0 or step == (len(valid_loader) - 1):
             print(
                 "EVAL: [{0}/{1}] "
                 "Elapsed {remain:s} "
@@ -163,9 +167,7 @@ def valid_fn(valid_loader, model, criterion, device):
                     remain=timeSince(start, float(step + 1) / len(valid_loader)),
                 )
             )
-        if getattr(CFG, "fast_debug", False) and (step + 1) >= getattr(
-            CFG, "debug_val_steps", 1
-        ):
+        if not cfg.debug.fast_debug and (step + 1) >= cfg.debug.debug_val_steps:
             print(f"[DEBUG] valid early-exit after {step+1} steps (seen={n_seen})")
             break
 

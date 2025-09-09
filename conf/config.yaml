@@ -1,0 +1,7 @@
+defaults:
+  - debug: debug
+  - logging: logging
+  - model: model
+  - training: training
+  - infer: infer
+  - data_loading: data_loading

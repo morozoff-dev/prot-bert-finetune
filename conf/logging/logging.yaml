@@ -1,0 +1,8 @@
+wandb: False
+competition: FB3
+_wandb_kernel: nakama
+debug: False
+apex: True
+print_freq: 20
+
+train_log_path: outputs/train.log

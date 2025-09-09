@@ -1,0 +1,5 @@
+fast_debug: True
+debug_steps: 2
+debug_epochs: 1
+debug_val_steps: 1
+debug_fold: 0

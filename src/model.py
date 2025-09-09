@@ -4,8 +4,6 @@ from torch.serialization import add_safe_globals
 from transformers import AutoConfig, AutoModel
 from transformers.models.esm.configuration_esm import EsmConfig
 
-from src.utils import LOGGER
-
 
 class MeanPooling(nn.Module):
     def __init__(self):
@@ -28,27 +26,27 @@ class CustomModel(nn.Module):
         self.cfg = cfg
         if config_path is None:
             self.config = AutoConfig.from_pretrained(
-                cfg.model, output_hidden_states=True
+                cfg.model.model, output_hidden_states=True
             )
             self.config.hidden_dropout = 0.0
             self.config.hidden_dropout_prob = 0.0
             self.config.attention_dropout = 0.0
             self.config.attention_probs_dropout_prob = 0.0
-            LOGGER.info(self.config)
+            # logger.info(self.config)
         else:
             add_safe_globals([EsmConfig])
             self.config = torch.load(config_path, weights_only=False)
             # self.config = AutoConfig.from_pretrained(config_path)
         if pretrained:
-            self.model = AutoModel.from_pretrained(cfg.model, config=self.config)
+            self.model = AutoModel.from_pretrained(cfg.model.model, config=self.config)
         else:
             self.model = AutoModel.from_config(self.config)
 
-        if self.cfg.gradient_checkpointing:
+        if self.cfg.model.gradient_checkpointing:
             self.model.gradient_checkpointing_enable()
         self.pool = MeanPooling()
-        self.fc1 = nn.Linear(self.config.hidden_size, self.cfg.pca_dim)
-        self.fc2 = nn.Linear(self.cfg.pca_dim * 6, 1)
+        self.fc1 = nn.Linear(self.config.hidden_size, self.cfg.model.pca_dim)
+        self.fc2 = nn.Linear(self.cfg.model.pca_dim * 6, 1)
         self._init_weights(self.fc1)
         self._init_weights(self.fc2)
 

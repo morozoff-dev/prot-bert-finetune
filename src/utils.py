@@ -5,8 +5,6 @@ from logging import INFO, FileHandler, Formatter, StreamHandler, getLogger
 import numpy as np
 import torch
 
-from conf.config import CFG
-
 
 def _rmse_np(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """RMSE без sklearn, с защитой от NaN."""
@@ -50,8 +48,8 @@ def get_score(y_trues: np.ndarray, y_preds: np.ndarray):
 
 
 def get_logger(
-    filename=CFG.path + "train",
-):  # только в трейне получается логгер используем
+    filename,
+):
     logger = getLogger(__name__)
     logger.setLevel(INFO)
     handler1 = StreamHandler()
@@ -63,9 +61,6 @@ def get_logger(
     return logger
 
 
-LOGGER = get_logger()
-
-
 def seed_everything(seed=42):
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -73,6 +68,3 @@ def seed_everything(seed=42):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
-
-
-seed_everything(seed=42)

@@ -1,0 +1,11 @@
+# путь к входному CSV
+input_csv: data/demo_input.csv
+
+# куда писать результат
+output_csv: outputs/predictions.csv
+
+# если True — трактуем вход как kaggle test.csv (protein_sequence/seq_id)
+as_kaggle_test: true
+
+# базовая WT-последовательность для kaggle-режима
+base_wt: "VPVNPEPDATSVENVALKTGSGDSQSDPIKADLEVKGQSALPFDVDCWAILCKGAPNVLQRVNEKTKNSNRDRSGANKGPFKDPQKWGIKALPPKNPSWSAQDFKSPEEYAFASSLQGGTNAILAPVNLASQNSQGGVLNGFYSANKVAQFDPSKPQQTKGTWFQITKFTGAAGPYCKALGSNDKSVCDKNKNIAGDWGFDPAKWAYQYDEKNNKFNYVGK"

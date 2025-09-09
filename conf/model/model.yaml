@@ -1,0 +1,18 @@
+num_workers: 0
+model: facebook/esm2_t33_650M_UR50D
+gradient_checkpointing: False
+scheduler: constant
+batch_scheduler: True
+num_warmup_steps: 0
+
+pca_dim: 64
+
+total_blocks: 33
+initial_layers: 2
+layers_per_block: 16
+
+num_freeze_blocks: 30
+
+model_weights_path: outputs/best/
+config_path: outputs/config.pth
+tokenizer_dir: outputs/tokenizer/

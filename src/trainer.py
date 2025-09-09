@@ -12,42 +12,41 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-from conf.config import CFG
 from src.dataset import TrainDataset
 from src.helpers import train_fn, valid_fn
 from src.losses import RMSELoss
 from src.model import CustomModel
-from src.utils import LOGGER, get_score
+from src.utils import get_score
 
 
-def train_loop(folds, fold):
+def train_loop(folds, fold, config, logger):
 
-    LOGGER.info(f"========== fold: {fold} training ==========")
+    logger.info(f"========== fold: {fold} training ==========")
 
     # ====================================================
     # loader
     # ====================================================
     train_folds = folds[folds["fold"] != fold].reset_index(drop=True)
     valid_folds = folds[folds["fold"] == fold].reset_index(drop=True)
-    valid_labels = valid_folds[CFG.target_cols].values
+    valid_labels = valid_folds[config.training.target_cols].values
     print("### train shape:", train_folds.shape)
 
-    train_dataset = TrainDataset(CFG, train_folds)
-    valid_dataset = TrainDataset(CFG, valid_folds)
+    train_dataset = TrainDataset(config, train_folds)
+    valid_dataset = TrainDataset(config, valid_folds)
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=CFG.batch_size,
+        batch_size=config.training.batch_size,
         shuffle=True,
-        num_workers=CFG.num_workers,
+        num_workers=config.model.num_workers,
         pin_memory=True,
         drop_last=True,
     )
     valid_loader = DataLoader(
         valid_dataset,
-        batch_size=CFG.batch_size,
+        batch_size=config.training.batch_size,
         shuffle=False,
-        num_workers=CFG.num_workers,
+        num_workers=config.model.num_workers,
         pin_memory=True,
         drop_last=False,
     )
@@ -55,18 +54,20 @@ def train_loop(folds, fold):
     # ====================================================
     # model & optimizer
     # ====================================================
-    model = CustomModel(CFG, config_path=None, pretrained=True)
-    torch.save(model.config, CFG.path + "config.pth")
+    model = CustomModel(config, config_path=None, pretrained=True)
+    torch.save(model.config, config.model.config_path)
 
     # FREEZE LAYERS
-    if CFG.num_freeze_blocks > 0:
+    if config.model.num_freeze_blocks > 0:
         print(
-            f"### Freezing first {CFG.num_freeze_blocks} blocks.",
-            f"Leaving {CFG.total_blocks-CFG.num_freeze_blocks} blocks unfrozen",
+            f"### Freezing first {config.model.num_freeze_blocks} blocks.",
+            f"Leaving {config.model.total_blocks-config.model.num_freeze_blocks} blocks unfrozen",
         )
-        for _, param in list(model.named_parameters())[
-            : CFG.initial_layers + CFG.layers_per_block * CFG.num_freeze_blocks
-        ]:
+        cfg_pth = config.model.model_weights_path
+        layers_len = (
+            cfg_pth + config.model.layers_per_block * config.model.num_freeze_blocks
+        )
+        for _, param in list(model.named_parameters())[:layers_len]:
             param.requires_grad = False
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -102,62 +103,77 @@ def train_loop(folds, fold):
 
     optimizer_parameters = get_optimizer_params(
         model,
-        encoder_lr=CFG.encoder_lr,
-        decoder_lr=CFG.decoder_lr,
-        weight_decay=CFG.weight_decay,
+        encoder_lr=config.training.encoder_lr,
+        decoder_lr=config.training.decoder_lr,
+        weight_decay=config.training.weight_decay,
     )
     optimizer = AdamW(
-        optimizer_parameters, lr=CFG.encoder_lr, eps=CFG.eps, betas=CFG.betas
+        optimizer_parameters,
+        lr=config.training.encoder_lr,
+        eps=config.training.eps,
+        betas=config.training.betas,
     )
 
     # ====================================================
     # scheduler
     # ====================================================
-    def get_scheduler(cfg, optimizer, num_train_steps):
-        if cfg.scheduler == "linear":
+    def get_scheduler(config, optimizer, num_train_steps):
+        if config.model.scheduler == "linear":
             scheduler = get_linear_schedule_with_warmup(
                 optimizer,
-                num_warmup_steps=cfg.num_warmup_steps,
+                num_warmup_steps=config.model.num_warmup_steps,
                 num_training_steps=num_train_steps,
             )
-        elif cfg.scheduler == "constant":
+        elif config.model.scheduler == "constant":
             scheduler = get_constant_schedule_with_warmup(
-                optimizer, num_warmup_steps=cfg.num_warmup_steps
+                optimizer, num_warmup_steps=config.model.num_warmup_steps
             )
-        elif cfg.scheduler == "cosine":
+        elif config.model.scheduler == "cosine":
             scheduler = get_cosine_schedule_with_warmup(
                 optimizer,
-                num_warmup_steps=cfg.num_warmup_steps,
+                num_warmup_steps=config.model.num_warmup_steps,
                 num_training_steps=num_train_steps,
-                num_cycles=cfg.num_cycles,
+                num_cycles=config.training.num_cycles,
             )
         return scheduler
 
-    num_train_steps = int(len(train_folds) / CFG.batch_size * CFG.epochs)
-    scheduler = get_scheduler(CFG, optimizer, num_train_steps)
+    num_train_steps = int(
+        len(train_folds) / config.training.batch_size * config.training.epochs
+    )
+    scheduler = get_scheduler(config, optimizer, num_train_steps)
 
     # ====================================================
     # loop
     # ====================================================
-    criterion = RMSELoss(reduction="mean")  # nn.SmoothL1Loss(reduction='mean')
+    criterion = RMSELoss(reduction="mean")
 
     best_score = np.inf
 
-    for epoch in range(CFG.debug_epochs if CFG.fast_debug else CFG.epochs):
+    for epoch in range(
+        config.debug.debug_epochs if config.debug.fast_debug else config.training.epochs
+    ):
 
         start_time = time.time()
 
         # train
         avg_loss = train_fn(
-            fold, train_loader, model, criterion, optimizer, epoch, scheduler, device
+            fold,
+            train_loader,
+            model,
+            criterion,
+            optimizer,
+            epoch,
+            scheduler,
+            device,
+            config,
         )
 
         # eval
         avg_val_loss, predictions_part, n_seen = valid_fn(
-            valid_loader, model, criterion, device
+            valid_loader, model, criterion, device, config
         )
 
-        if CFG.fast_debug:
+        if config.debug.fast_debug:
             # создаём "полный" массив предиктов под размер фолда и кладём первые n_seen
             full_preds = np.full((len(valid_folds), 1), np.nan, dtype=np.float32)
             take = min(n_seen, len(valid_folds), predictions_part.shape[0])
@@ -169,24 +185,25 @@ def train_loop(folds, fold):
             preds_subset = full_preds[:take]
             try:
                 pscore, pscores = get_score(labels_subset, preds_subset)
-                LOGGER.info(
+                logger.info(
                     f"[DEBUG] Partial Score on first {take}: {pscore:.4f}  Scores: {pscores}"
                 )
             except Exception as e:
-                LOGGER.info(f"[DEBUG] Partial Score skipped: {e}")
+                logger.info(f"[DEBUG] Partial Score skipped: {e}")
 
             # сохранить веса (и опционально частичные предикты)
+            cfg_pth = config.model.model_weights_path
             torch.save(
                 {
                     "model": model.state_dict(),
                     "predictions_partial": full_preds,
                     "n_seen": int(take),
                 },
-                CFG.path + f"{CFG.model.replace('/', '-')}_fold{fold}_best.pth",
+                cfg_pth + f"{config.model.model.replace('/', '-')}_fold{fold}_best.pth",
             )
 
             # положить колонки в DF (частично)
-            for i, c in enumerate(CFG.target_cols):
+            for i, c in enumerate(config.training.target_cols):
                 valid_folds[f"pred_{c}"] = (
                     full_preds[:, i] if full_preds.ndim > 1 else full_preds[:, 0]
                 )
@@ -195,11 +212,11 @@ def train_loop(folds, fold):
             # Обычный путь на полном валиде
             score, scores = get_score(valid_labels, predictions_part)
             elapsed = time.time() - start_time
-            LOGGER.info(
+            logger.info(
                 f"Epoch {epoch+1} - avg_train_loss: {avg_loss:.4f}  avg_val_loss: {avg_val_loss:.4f}  time: {elapsed:.0f}s"
             )
-            LOGGER.info(f"Epoch {epoch+1} - Score: {score:.4f}  Scores: {scores}")
-            if CFG.wandb:
+            logger.info(f"Epoch {epoch+1} - Score: {score:.4f}  Scores: {scores}")
+            if config.logging.wandb:
                 wandb.log(
                     {
                         f"[fold{fold}] epoch": epoch + 1,
@@ -210,15 +227,17 @@ def train_loop(folds, fold):
                 )
             if best_score > score:
                 best_score = score
-                LOGGER.info(
+                logger.info(
                     f"Epoch {epoch+1} - Save Best Score: {best_score:.4f} Model"
                 )
+                cfg_pth = config.model.model_weights_path
+                cfg_model = config.model.model
                 torch.save(
                     {"model": model.state_dict(), "predictions": predictions_part},
-                    CFG.path + f"{CFG.model.replace('/', '-')}_fold{fold}_best.pth",
+                    cfg_pth + f"{cfg_model.replace('/', '-')}_fold{fold}_best.pth",
                 )
                 # и положим в DF для этого фолда
-                for i, c in enumerate(CFG.target_cols):
+                for i, c in enumerate(config.training.target_cols):
                     valid_folds[f"pred_{c}"] = (
                         predictions_part[:, i]
                         if predictions_part.ndim > 1
