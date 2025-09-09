@@ -131,45 +131,82 @@ def train_fn(
 
 
 def valid_fn(valid_loader, model, criterion, device, cfg):
-    losses = AverageMeter()
+    """
+    Возвращает:
+      avg_val_loss: float (NaN, если не было ни одного батча)
+      predictions : np.ndarray формы (N, C) или (0, C) при пустом наборе
+      n_seen      : int — сколько объектов реально прошло через валид
+    """
     model.eval()
+
+    losses = AverageMeter()
     preds = []
     n_seen = 0
     start = time.time()
-    for step, (inputs1, inputs2, position, labels) in enumerate(valid_loader):
-        # inputs = collate(inputs)
-        for k, v in inputs1.items():
-            inputs1[k] = v.to(device)
-        for k, v in inputs2.items():
-            inputs2[k] = v.to(device)
-        position = position.to(device)
-        labels = labels.to(device)
-        bs = labels.size(0)
 
-        batch_size = labels.size(0)
-        with torch.no_grad():
+    # число таргетов (на случай пустого infer/раннего выхода)
+    try:
+        n_targets = max(1, len(getattr(cfg.training, "target_cols", [])))
+    except Exception:
+        n_targets = 1
+
+    with torch.no_grad():
+        for step, (inputs1, inputs2, position, labels) in enumerate(valid_loader):
+            # на устройство
+            for k, v in inputs1.items():
+                inputs1[k] = v.to(device)
+            for k, v in inputs2.items():
+                inputs2[k] = v.to(device)
+            position = position.to(device)
+            labels = labels.to(device)
+
+            bs = labels.size(0)
+
+            # forward + loss
             y_preds = model(inputs1, inputs2, position)
             loss = criterion(y_preds, labels)
-        if cfg.training.gradient_accumulation_steps > 1:
-            loss = loss / cfg.training.gradient_accumulation_steps
-        losses.update(loss.item(), batch_size)
-        preds.append(y_preds.to("cpu").numpy())
-        n_seen += bs
+            loss_value = float(loss.detach().item())
 
-        if step % cfg.logging.print_freq == 0 or step == (len(valid_loader) - 1):
-            print(
-                "EVAL: [{0}/{1}] "
-                "Elapsed {remain:s} "
-                "Loss: {loss.val:.4f}({loss.avg:.4f}) ".format(
-                    step,
-                    len(valid_loader),
-                    loss=losses,
-                    remain=timeSince(start, float(step + 1) / len(valid_loader)),
+            # Валидация не нуждается в делении на gradient_accumulation_steps,
+            # но если хочешь сохранить семантику — оставь строку ниже закомментированной:
+            # if cfg.training.gradient_accumulation_steps > 1:
+            #     loss_value /= cfg.training.gradient_accumulation_steps
+
+            losses.update(loss_value, bs)
+            preds.append(y_preds.detach().cpu().numpy())
+            n_seen += bs
+
+            if step % cfg.logging.print_freq == 0 or step == (len(valid_loader) - 1):
+                print(
+                    "EVAL: [{0}/{1}] "
+                    "Elapsed {remain:s} "
+                    "Loss: {loss.val:.4f}({loss.avg:.4f}) ".format(
+                        step,
+                        len(valid_loader),
+                        loss=losses,
+                        remain=timeSince(
+                            start, float(step + 1) / max(1, len(valid_loader))
+                        ),
+                    )
                 )
-            )
-        if cfg.debug.fast_debug and (step + 1) >= cfg.debug.debug_val_steps:
-            print(f"[DEBUG] valid early-exit after {step+1} steps (seen={n_seen})")
-            break
 
-    predictions = np.concatenate(preds, axis=0) if len(preds) else np.empty((0, 1))
-    return losses.avg, predictions, n_seen
+            # ранний выход в debug-режиме
+            if getattr(cfg.debug, "fast_debug", False) and (step + 1) >= getattr(
+                cfg.debug, "debug_val_steps", 1
+            ):
+                print(f"[DEBUG] valid early-exit after {step+1} steps (seen={n_seen})")
+                break
+
+    # аккуратно склеиваем предсказания
+    if preds:
+        predictions = np.concatenate(preds, axis=0)
+    else:
+        # пустой валид/очень ранний выход: вернём корректной формы пустой массив
+        predictions = np.empty((0, n_targets), dtype=np.float32)
+
+    # средний лосс: если не было батчей — вернём NaN (train_loop это учтёт)
+    avg_val_loss = (
+        float(losses.avg) if getattr(losses, "count", 0) > 0 else float("nan")
+    )
+
+    return avg_val_loss, predictions, n_seen

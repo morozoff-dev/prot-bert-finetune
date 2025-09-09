@@ -3,7 +3,6 @@ import time
 
 import numpy as np
 import torch
-import wandb
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from transformers import (
@@ -19,13 +18,12 @@ from src.model import CustomModel
 from src.utils import get_score
 
 
-def train_loop(folds, fold, config, logger):
-
+def train_loop(folds, fold, config, logger, mlflow_run=None):
     logger.info(f"========== fold: {fold} training ==========")
 
-    # ====================================================
-    # loader
-    # ====================================================
+    # =======================
+    # loaders
+    # =======================
     train_folds = folds[folds["fold"] != fold].reset_index(drop=True)
     valid_folds = folds[folds["fold"] == fold].reset_index(drop=True)
     valid_labels = valid_folds[config.training.target_cols].values
@@ -51,17 +49,17 @@ def train_loop(folds, fold, config, logger):
         drop_last=False,
     )
 
-    # ====================================================
+    # =======================
     # model & optimizer
-    # ====================================================
+    # =======================
     model = CustomModel(config, config_path=None, pretrained=True)
     torch.save(model.config, config.model.config_path)
 
-    # FREEZE LAYERS
+    # freeze encoder blocks
     if config.model.num_freeze_blocks > 0:
         print(
             f"### Freezing first {config.model.num_freeze_blocks} blocks.",
-            f"Leaving {config.model.total_blocks-config.model.num_freeze_blocks} blocks unfrozen",
+            f"Leaving {config.model.total_blocks - config.model.num_freeze_blocks} blocks unfrozen",
         )
         init_layers = config.model.initial_layers
         layers_len = (
@@ -69,6 +67,7 @@ def train_loop(folds, fold, config, logger):
         )
         for _, param in list(model.named_parameters())[:layers_len]:
             param.requires_grad = False
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
@@ -114,45 +113,47 @@ def train_loop(folds, fold, config, logger):
         betas=config.training.betas,
     )
 
-    # ====================================================
+    # =======================
     # scheduler
-    # ====================================================
+    # =======================
     def get_scheduler(config, optimizer, num_train_steps):
         if config.model.scheduler == "linear":
-            scheduler = get_linear_schedule_with_warmup(
+            return get_linear_schedule_with_warmup(
                 optimizer,
                 num_warmup_steps=config.model.num_warmup_steps,
                 num_training_steps=num_train_steps,
             )
         elif config.model.scheduler == "constant":
-            scheduler = get_constant_schedule_with_warmup(
+            return get_constant_schedule_with_warmup(
                 optimizer, num_warmup_steps=config.model.num_warmup_steps
             )
         elif config.model.scheduler == "cosine":
-            scheduler = get_cosine_schedule_with_warmup(
+            return get_cosine_schedule_with_warmup(
                 optimizer,
                 num_warmup_steps=config.model.num_warmup_steps,
                 num_training_steps=num_train_steps,
                 num_cycles=config.training.num_cycles,
             )
-        return scheduler
+        else:
+            return None
 
     num_train_steps = int(
         len(train_folds) / config.training.batch_size * config.training.epochs
     )
     scheduler = get_scheduler(config, optimizer, num_train_steps)
 
-    # ====================================================
+    # =======================
     # loop
-    # ====================================================
+    # =======================
     criterion = RMSELoss(reduction="mean")
 
+    history = []  # (epoch, train_loss, val_loss, score, lr)
     best_score = np.inf
 
-    for epoch in range(
+    max_epochs = (
         config.debug.debug_epochs if config.debug.fast_debug else config.training.epochs
-    ):
-
+    )
+    for epoch in range(max_epochs):
         start_time = time.time()
 
         # train
@@ -173,70 +174,99 @@ def train_loop(folds, fold, config, logger):
             valid_loader, model, criterion, device, config
         )
 
+        # score (partial в fast_debug)
         if config.debug.fast_debug:
-            # создаём "полный" массив предиктов под размер фолда и кладём первые n_seen
             full_preds = np.full((len(valid_folds), 1), np.nan, dtype=np.float32)
             take = min(n_seen, len(valid_folds), predictions_part.shape[0])
             if take > 0:
                 full_preds[:take] = predictions_part[:take]
-
-            # partial score (только по тем, кто предсказан)
             labels_subset = valid_labels[:take]
             preds_subset = full_preds[:take]
             try:
-                pscore, pscores = get_score(labels_subset, preds_subset)
+                score, scores = get_score(labels_subset, preds_subset)
                 logger.info(
-                    f"[DEBUG] Partial Score on first {take}: {pscore:.4f}  Scores: {pscores}"
+                    f"[DEBUG] Partial Score on first {take}: {score:.4f}  Scores: {scores}"
                 )
             except Exception as e:
                 logger.info(f"[DEBUG] Partial Score skipped: {e}")
+                score, scores = float("nan"), [float("nan")]
 
-            # сохранить веса (и опционально частичные предикты)
-            cfg_pth = config.model.model_weights_path
+            # сохраним частичный чекпоинт (как было)
+            model_wgths_pth = config.model.model_weights_path
+            model = config.model.model
             torch.save(
                 {
                     "model": model.state_dict(),
                     "predictions_partial": full_preds,
                     "n_seen": int(take),
                 },
-                cfg_pth + f"{config.model.model.replace('/', '-')}_fold{fold}_best.pth",
+                model_wgths_pth + f"{model.replace('/', '-')}_fold{fold}_best.pth",
             )
 
-            # положить колонки в DF (частично)
+            # предикты в DF (частичные)
             for i, c in enumerate(config.training.target_cols):
                 valid_folds[f"pred_{c}"] = (
                     full_preds[:, i] if full_preds.ndim > 1 else full_preds[:, 0]
                 )
 
         else:
-            # Обычный путь на полном валиде
             score, scores = get_score(valid_labels, predictions_part)
-            elapsed = time.time() - start_time
-            logger.info(
-                f"Epoch {epoch+1} - avg_train_loss: {avg_loss:.4f}  avg_val_loss: {avg_val_loss:.4f}  time: {elapsed:.0f}s"
+
+        # lr текущий
+        try:
+            last_lr = (
+                scheduler.get_last_lr()[0]
+                if scheduler is not None
+                else optimizer.param_groups[0]["lr"]
             )
-            logger.info(f"Epoch {epoch+1} - Score: {score:.4f}  Scores: {scores}")
-            if config.logging.wandb:
-                wandb.log(
-                    {
-                        f"[fold{fold}] epoch": epoch + 1,
-                        f"[fold{fold}] avg_train_loss": avg_loss,
-                        f"[fold{fold}] avg_val_loss": avg_val_loss,
-                        f"[fold{fold}] score": score,
-                    }
-                )
+        except Exception:
+            last_lr = optimizer.param_groups[0]["lr"]
+
+        elapsed = time.time() - start_time
+        logger.info(
+            f"Epoch {epoch+1} - avg_train_loss: {avg_loss:.4f}  "
+            f"avg_val_loss: {avg_val_loss:.4f}  time: {int(elapsed):d}s"
+        )
+        logger.info(f"Epoch {epoch+1} - Score: {score:.4f}  Scores: {scores}")
+
+        # ——— история для графиков и дальнейшего сохранения ———
+        history.append(
+            (
+                epoch + 1,
+                float(avg_loss) if np.isfinite(avg_loss) else float("nan"),
+                float(avg_val_loss) if np.isfinite(avg_val_loss) else float("nan"),
+                float(score) if np.isfinite(score) else float("nan"),
+                float(last_lr),
+            )
+        )
+
+        # ——— MLflow: логируем метрики КАЖДУЮ эпоху (даже в fast_debug) ———
+        if mlflow_run is not None:
+            import mlflow
+
+            step = epoch + 1
+            if np.isfinite(avg_loss):
+                mlflow.log_metric("train_loss", float(avg_loss), step=step)
+            if np.isfinite(avg_val_loss):
+                mlflow.log_metric("val_loss", float(avg_val_loss), step=step)
+            if np.isfinite(score):
+                mlflow.log_metric("score", float(score), step=step)
+            mlflow.log_metric("lr", float(last_lr), step=step)
+
+        # ——— сохранение лучшего чекпоинта ———
+        if not config.debug.fast_debug:
             if best_score > score:
                 best_score = score
                 logger.info(
                     f"Epoch {epoch+1} - Save Best Score: {best_score:.4f} Model"
                 )
-                cfg_pth = config.model.model_weights_path
-                cfg_model = config.model.model
+                model_wgths_pth = config.model.model_weights_path
+                model = config.model.model
                 torch.save(
                     {"model": model.state_dict(), "predictions": predictions_part},
-                    cfg_pth + f"{cfg_model.replace('/', '-')}_fold{fold}_best.pth",
+                    model_wgths_pth + f"{model.replace('/', '-')}_fold{fold}_best.pth",
                 )
-                # и положим в DF для этого фолда
+                # предикты в DF (полные)
                 for i, c in enumerate(config.training.target_cols):
                     valid_folds[f"pred_{c}"] = (
                         predictions_part[:, i]
@@ -246,5 +276,4 @@ def train_loop(folds, fold, config, logger):
 
     torch.cuda.empty_cache()
     gc.collect()
-
-    return valid_folds
+    return valid_folds, history

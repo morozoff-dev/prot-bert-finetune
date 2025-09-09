@@ -35,3 +35,7 @@ gdrive-service.json
 
 # Logs
 *.log
+
+# MLFlow
+mlruns/
+mlflow.db

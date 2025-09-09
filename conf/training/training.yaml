@@ -2,7 +2,7 @@ epochs: 1
 num_cycles: 1.0
 encoder_lr: 5e-5
 decoder_lr: 5e-5
-batch_size: 1
+batch_size: 4
 
 min_lr: 1e-6
 eps: 1e-6

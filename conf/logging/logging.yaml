@@ -4,5 +4,12 @@ _wandb_kernel: nakama
 debug: False
 apex: True
 print_freq: 20
-
 train_log_path: outputs/train.log
+
+mlflow:
+  enable: true
+  tracking_uri: "http://127.0.0.1:8080"
+  experiment: "protein-stability"
+  run_name: "train-${model.model}"
+
+plots_dir: "plots"
