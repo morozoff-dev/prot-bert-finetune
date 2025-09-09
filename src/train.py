@@ -25,16 +25,15 @@ def get_result(oof_df, config, logger):
     logger.info(f"Score: {score:<.4f}  Scores: {scores}  (on {mask.sum()} rows)")
 
 
-@hydra.main(config_path="../conf", config_name="config")
+@hydra.main(config_path="../conf", config_name="config", version_base=None)
 def main(config: DictConfig):
     seed_everything(config.training.seed)
     logger = get_logger(config.logging.train_log_path)
-    # === подготовка train ===
+
     raw_csv = config.data_loading.train_data_path
 
     tokenizer = AutoTokenizer.from_pretrained(config.model.model)
     tokenizer.save_pretrained(config.model.tokenizer_dir)
-    # CFG.tokenizer = tokenizer
 
     train = preprocess_train_data(
         raw_csv_path=raw_csv,
@@ -62,7 +61,6 @@ def main(config: DictConfig):
         oof_df = oof_df.reset_index(drop=True)
         logger.info("========== CV ==========")
         get_result(oof_df, config, logger)
-        # oof_df.to_pickle(CFG.model_weights_path + "oof_df.pkl")
 
     if config.logging.wandb:
         wandb.finish()

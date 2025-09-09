@@ -167,7 +167,7 @@ def valid_fn(valid_loader, model, criterion, device, cfg):
                     remain=timeSince(start, float(step + 1) / len(valid_loader)),
                 )
             )
-        if not cfg.debug.fast_debug and (step + 1) >= cfg.debug.debug_val_steps:
+        if cfg.debug.fast_debug and (step + 1) >= cfg.debug.debug_val_steps:
             print(f"[DEBUG] valid early-exit after {step+1} steps (seen={n_seen})")
             break
 

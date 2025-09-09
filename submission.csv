@@ -1,4 +1,0 @@
-sequence,mutant_seq,position,prediction
-A C D E F G H I K,A C D E Y G H I K,5,0.045533232
-A C D E F G H I K,A C D E F G H I K K,10,0.009077674
-A C D E F G H I K,A C D F F G H I K,4,0.03651348

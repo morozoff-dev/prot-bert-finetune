@@ -63,9 +63,9 @@ def train_loop(folds, fold, config, logger):
             f"### Freezing first {config.model.num_freeze_blocks} blocks.",
             f"Leaving {config.model.total_blocks-config.model.num_freeze_blocks} blocks unfrozen",
         )
-        cfg_pth = config.model.model_weights_path
+        init_layers = config.model.initial_layers
         layers_len = (
-            cfg_pth + config.model.layers_per_block * config.model.num_freeze_blocks
+            init_layers + config.model.layers_per_block * config.model.num_freeze_blocks
         )
         for _, param in list(model.named_parameters())[:layers_len]:
             param.requires_grad = False

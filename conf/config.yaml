@@ -5,3 +5,8 @@ defaults:
   - training: training
   - infer: infer
   - data_loading: data_loading
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
