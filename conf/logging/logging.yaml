@@ -3,7 +3,7 @@ competition: FB3
 _wandb_kernel: nakama
 debug: False
 apex: True
-print_freq: 20
+print_freq: 1
 train_log_path: outputs/train.log
 
 mlflow:

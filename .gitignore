@@ -20,15 +20,10 @@ __pycache__/
 # Data & outputs
 data/*
 !data/*.dvc
-
-# outputs/config.pth
-# outputs/oof_df.pkl
-# outputs/train.log
-# outputs/tokenizer
-# outputs/best/*
-# outputs/predictions/*
 !outputs/best/*.dvc
 outputs/*
+
+lightning_logs/
 
 plots/
 gdrive-service.json

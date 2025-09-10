@@ -1,4 +1,4 @@
-epochs: 1
+epochs: 2
 num_cycles: 1.0
 encoder_lr: 5e-5
 decoder_lr: 5e-5
