@@ -1,7 +1,9 @@
 # src/train_pl.py
 from __future__ import annotations
 
+import glob
 import os
+import shutil
 import subprocess
 
 import hydra
@@ -61,38 +63,43 @@ def main(cfg: DictConfig):
             run_name=run_name,
         )
         # логируем гиперпараметры (весь конфиг)
-        mlf_logger.log_hyperparams(OmegaConf.to_container(cfg, resolve=True))
-        # git commit id как параметр или тег
+        try:
+            mlf_logger.log_hyperparams(OmegaConf.to_container(cfg, resolve=True))
+        except Exception:
+            pass
+        # git commit id как параметр и тег
         git_sha = _get_git_commit()
         if git_sha:
-            # как параметр
             try:
                 mlf_logger.experiment.log_param(
                     mlf_logger.run_id, "git_commit", git_sha
                 )
             except Exception:
                 pass
-            # и как тег (удобно для поиска)
             try:
                 mlf_logger.experiment.set_tag(mlf_logger.run_id, "git_commit", git_sha)
             except Exception:
                 pass
 
-    # === чекпоинты — можно отключить, чтобы не было 2ГБ файлов
-    # либо enable_checkpointing=False в Trainer,
-    # либо save_top_k=0:
+    # === директория чекпоинтов
     ckpt_dir = os.path.join(get_original_cwd(), cfg.model.model_weights_path)
     os.makedirs(ckpt_dir, exist_ok=True)
-    ckpt = ModelCheckpoint(
+
+    # === базовый чекпоинтер Lightning
+    # сохраняем лучший по val_loss (save_top_k=1), без автоматического добавления метрик в имя
+    checkpoint_cb = ModelCheckpoint(
         dirpath=ckpt_dir,
-        filename=f"{cfg.model.model.replace('/','-')}" + "-{epoch:02d}-{val_loss:.4f}",
-        save_top_k=0,  # <— не сохраняем модельные файлы
+        filename=f"{cfg.model.model.replace('/','-')}_fold{{fold}}",  # шаблон, ниже подставим fold
+        save_top_k=1,
         monitor="val_loss",
         mode="min",
         save_weights_only=True,
         auto_insert_metric_name=False,
     )
     lrmon = LearningRateMonitor(logging_interval="step")
+    plot_cb = PlotAndArtifactsCallback(
+        plots_dir=cfg.logging.plots_dir, enable_mlflow=True
+    )
 
     # === Trainer
     trainer = pl.Trainer(
@@ -105,25 +112,60 @@ def main(cfg: DictConfig):
         gradient_clip_val=cfg.training.max_grad_norm,
         accumulate_grad_batches=cfg.training.gradient_accumulation_steps,
         logger=(mlf_logger if mlf_logger is not None else False),
-        callbacks=[
-            ckpt,
-            lrmon,
-            PlotAndArtifactsCallback(
-                plots_dir=cfg.logging.plots_dir, enable_mlflow=True
-            ),
-        ],
+        callbacks=[checkpoint_cb, lrmon, plot_cb],
         log_every_n_steps=max(1, cfg.logging.print_freq),
         enable_progress_bar=True,
-        enable_checkpointing=True,  # оставить True — но save_top_k=0 не будет сохранять файлы
+        enable_checkpointing=True,
     )
 
     # === запуск по фолдам
     folds = [cfg.debug.debug_fold] if cfg.debug.fast_debug else cfg.training.trn_fold
+    model_stub = cfg.model.model.replace("/", "-")
+
     for fold in folds:
+        # Подставим номер фолда в имя файла чекпоинта
+        checkpoint_cb.filename = f"{model_stub}_fold{fold}"
+
+        # Почистим старые версии для этого фолда (чтобы Lightning не делал -v1, -v2)
+        for p in glob.glob(os.path.join(ckpt_dir, f"{model_stub}_fold{fold}*.ckpt")):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+        # Удалим фиксированный best, чтобы его корректно перезаписать по итогу
+        fixed_best = os.path.join(ckpt_dir, f"{model_stub}_fold{fold}_best.ckpt")
+        if os.path.exists(fixed_best):
+            try:
+                os.remove(fixed_best)
+            except OSError:
+                pass
+
+        # Данные и модель
         dm = ProteinDataModule(cfg, train, fold)
         dm.setup()
         pl_module = ProteinLightningModule(cfg)
+
+        # Тренировка
         trainer.fit(pl_module, datamodule=dm)
+
+        # Лучший чекпоинт за ран — копируем в фиксированное имя для DVC
+        best_path = checkpoint_cb.best_model_path
+        if best_path and os.path.exists(best_path):
+            shutil.copy2(best_path, fixed_best)
+
+            # (опционально) подчистим все прочие .ckpt для этого фолда, кроме fixed_best
+            for p in glob.glob(
+                os.path.join(ckpt_dir, f"{model_stub}_fold{fold}*.ckpt")
+            ):
+                if os.path.abspath(p) != os.path.abspath(fixed_best):
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
+
+    # На этом этапе в outputs/best/ будут лежать ровно:
+    #   <model>_foldN_best.ckpt  — по одному на каждый фолд (перезаписываются между запусками)
+    # Их удобно трекать в DVC.
 
 
 if __name__ == "__main__":
