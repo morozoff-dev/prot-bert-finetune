@@ -1,5 +1,0 @@
-outs:
-- md5: 3477f5224c0862575a5b41858531e0c5
-  size: 2604740231
-  hash: md5
-  path: facebook-esm2_t33_650M_UR50D_fold4_best.pth
