@@ -130,8 +130,49 @@ def prepare_dataframe(cfg: DictConfig) -> Tuple[pd.DataFrame, bool]:
     return df, is_kaggle
 
 
+def _load_weights_into_model(model: torch.nn.Module, ckpt_path: str):
+    """
+    Поддерживает:
+      - Lightning .checkpoint/.ckpt (ключ 'state_dict', имена с префиксом 'model.')
+      - Старые .pth (ключ 'model' со state_dict модели)
+    """
+    state = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+
+    if isinstance(state, dict) and "state_dict" in state:
+        # Lightning checkpoint: вытащим только веса self.model.* и снимем префикс 'model.'
+        pl_sd = state["state_dict"]
+        cleaned = {}
+        for k, v in pl_sd.items():
+            if k.startswith("model."):
+                cleaned[k[len("model.") :]] = v
+        model.load_state_dict(cleaned, strict=False)
+    elif isinstance(state, dict) and "model" in state:
+        # Старый формат
+        model.load_state_dict(state["model"], strict=True)
+    else:
+        # На всякий случай — пробуем загрузить как есть
+        model.load_state_dict(state, strict=False)
+
+
+def _resolve_ckpt_path(checkpoint_dir: str, base_name: str, fold: int) -> str:
+    """
+    Пробуем .ckpt, иначе старый _best.pth.
+    """
+    candidates = [
+        os.path.join(checkpoint_dir, f"{base_name}_fold{fold}_best.ckpt"),
+        os.path.join(checkpoint_dir, f"{base_name}_fold{fold}_best.pth"),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    raise FileNotFoundError(
+        f"Не найден чекпоинт для фолда {fold}. Искомые файлы:\n" + "\n".join(candidates)
+    )
+
+
 def load_and_predict(cfg: DictConfig, df: pd.DataFrame, folds: List[int]) -> np.ndarray:
     checkpoint_dir = cfg.model.model_weights_path
+    base_name = cfg.model.model.replace("/", "-")
 
     test_dataset = TestDataset(cfg, df)
     test_loader = DataLoader(
@@ -148,18 +189,14 @@ def load_and_predict(cfg: DictConfig, df: pd.DataFrame, folds: List[int]) -> np.
 
     for fold in folds:
         model = CustomModel(cfg, config_path=cfg.model.config_path, pretrained=False)
-        ckpt_path = os.path.join(
-            checkpoint_dir, f"{cfg.model.model.replace('/', '-')}_fold{fold}_best.pth"
-        )
-        state = torch.load(
-            ckpt_path, map_location=torch.device("cpu"), weights_only=False
-        )
-        model.load_state_dict(state["model"])
+
+        ckpt_path = _resolve_ckpt_path(checkpoint_dir, base_name, fold)
+        _load_weights_into_model(model, ckpt_path)
 
         preds = inference_fn(test_loader, model, device)
         preds_folds.append(preds.astype(np.float32))
 
-        del model, state, preds
+        del model, preds
         gc.collect()
         torch.cuda.empty_cache()
 
@@ -186,19 +223,16 @@ def write_output(
 
 @hydra.main(config_path="../conf", config_name="config", version_base=None)
 def main(cfg: DictConfig):
-    # печать финальной конфигурации (полезно при дебаге)
-    # print(OmegaConf.to_yaml(cfg))
-
-    # 2) подготовить датафрейм
+    # 1) подготовить датафрейм
     df, is_kaggle = prepare_dataframe(cfg)
 
-    # 3) фолды
+    # 2) фолды
     folds = load_folds(cfg)
 
-    # 4) инференс
+    # 3) инференс
     preds = load_and_predict(cfg, df, folds)
 
-    # 5) записать вывод
+    # 4) записать вывод
     write_output(cfg, df, preds, is_kaggle)
     print(f"[OK] Saved predictions to {cfg.infer.output_csv}")
 
