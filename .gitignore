@@ -20,8 +20,11 @@ __pycache__/
 # Data & outputs
 data/*
 !data/*.dvc
-!outputs/best/*.dvc
+
 outputs/*
+outputs/best/*.ckpt
+!outputs/best/
+!outputs/best/*.dvc
 
 lightning_logs/
 

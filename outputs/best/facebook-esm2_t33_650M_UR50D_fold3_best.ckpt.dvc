@@ -1,0 +1,5 @@
+outs:
+- md5: a468af206be65474a5f9a7af1a7ebc61
+  size: 2604725447
+  hash: md5
+  path: facebook-esm2_t33_650M_UR50D_fold3_best.ckpt
