@@ -8,7 +8,7 @@ from transformers import AutoTokenizer
 
 
 def prepare_input(cfg, text):
-    tokenizer = AutoTokenizer.from_pretrained(cfg.model.tokenizer_dir)
+    tokenizer = AutoTokenizer.from_pretrained(cfg.model.model)
     inputs = tokenizer.encode_plus(
         text,
         return_tensors=None,

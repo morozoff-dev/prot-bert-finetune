@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import wandb
 from omegaconf import DictConfig
-from transformers import AutoTokenizer
 
 from src.preprocessing import add_cv_folds, preprocess_train_data
 from src.trainer import train_loop
@@ -56,8 +55,8 @@ def main(config: DictConfig):
 
     raw_csv = config.data_loading.train_data_path
 
-    tokenizer = AutoTokenizer.from_pretrained(config.model.model)
-    tokenizer.save_pretrained(config.model.tokenizer_dir)
+    # tokenizer = AutoTokenizer.from_pretrained(config.model.model)
+    # tokenizer.save_pretrained(config.model.tokenizer_dir)
 
     train = preprocess_train_data(
         raw_csv_path=raw_csv,
