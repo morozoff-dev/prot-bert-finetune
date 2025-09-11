@@ -1,5 +1,5 @@
 [project]
-name = "prot-bert-finetune"
+name = "protein-stability"
 version = "0.1.0"
 description = ""
 authors = [

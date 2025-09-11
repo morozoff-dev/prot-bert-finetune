@@ -55,7 +55,7 @@
 Обучение модели запускается через PyTorch Lightning:
 
 ```bash
-poetry run python -m src.train_pl
+poetry run python -m protein_stability.train_pl
 ```
 
 Полезные параметры:
@@ -67,7 +67,7 @@ poetry run python -m src.train_pl
 Пример запуска:
 
 ```bash
-poetry run python -m src.train_pl   logging.mlflow.enable=true   logging.mlflow.tracking_uri=http://127.0.0.1:8080   logging.mlflow.experiment=protein-stability   logging.mlflow.run_name=train-esm2   training.trn_fold="[0,1,2,3,4]"
+poetry run python -m protein_stability.train_pl   logging.mlflow.enable=true   logging.mlflow.tracking_uri=http://127.0.0.1:8080   logging.mlflow.experiment=protein-stability   logging.mlflow.run_name=train-esm2   training.trn_fold="[0,1,2,3,4]"
 ```
 
 После обучения в `outputs/best/` появятся файлы:
@@ -100,7 +100,7 @@ dvc push -r models
   ```
 - Обязательные артефакты:
   - чекпоинты моделей,
-  - код (`src/`),
+  - код (`protein_stability/`),
   - конфиги (`conf/`).
 
 ---
@@ -110,7 +110,7 @@ dvc push -r models
 Предсказания запускаются через:
 
 ```bash
-poetry run python -m src.predict infer.input_csv=data/test.csv infer.output_csv=outputs/preds.csv
+poetry run python -m protein_stability.predict infer.input_csv=data/test.csv infer.output_csv=outputs/preds.csv
 ```
 
 #### Поддерживаемые форматы данных
