@@ -1,4 +1,4 @@
-# ProtBERT Finetune
+# protein-stability
 
 ## Описание проекта
 
@@ -27,7 +27,7 @@
 
    ```bash
    git clone <url>
-   cd prot-bert-finetune
+   cd protein-stability
    ```
 
 2. Установить Poetry и зависимости:
