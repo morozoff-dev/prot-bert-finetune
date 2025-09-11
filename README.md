@@ -36,16 +36,27 @@
    poetry install
    ```
 
-3. Настроить DVC и подтянуть данные и модели:
+3. Настроить **pre-commit** (чтобы автоматически проверять стиль кода):
+
+   ```bash
+   poetry run pre-commit install
+   # проверить все файлы один раз вручную
+   poetry run pre-commit run -a
+   ```
+
+4. Настроить DVC и подтянуть данные и модели:
 
    ```bash
    dvc pull -r data     # скачать датасеты
    dvc pull -r models   # скачать модели (чекпоинты .ckpt)
    ```
 
-4. Запустить MLflow сервер (локально):
+5. Запустить MLflow сервер (локально):
    ```bash
-   poetry run mlflow server        --backend-store-uri sqlite:///mlflow.db        --default-artifact-root ./mlruns        --host 127.0.0.1 --port 8080
+   poetry run mlflow server \
+     --backend-store-uri sqlite:///mlflow.db \
+     --default-artifact-root ./mlruns \
+     --host 127.0.0.1 --port 8080
    ```
 
 ---
@@ -67,7 +78,12 @@ poetry run python -m protein_stability.train_pl
 Пример запуска:
 
 ```bash
-poetry run python -m protein_stability.train_pl   logging.mlflow.enable=true   logging.mlflow.tracking_uri=http://127.0.0.1:8080   logging.mlflow.experiment=protein-stability   logging.mlflow.run_name=train-esm2   training.trn_fold="[0,1,2,3,4]"
+poetry run python -m protein_stability.train_pl \
+  logging.mlflow.enable=true \
+  logging.mlflow.tracking_uri=http://127.0.0.1:8080 \
+  logging.mlflow.experiment=protein-stability \
+  logging.mlflow.run_name=train-esm2 \
+  training.trn_fold="[0,1,2,3,4]"
 ```
 
 После обучения в `outputs/best/` появятся файлы:
@@ -110,7 +126,9 @@ dvc push -r models
 Предсказания запускаются через:
 
 ```bash
-poetry run python -m protein_stability.predict infer.input_csv=data/test.csv infer.output_csv=outputs/preds.csv
+poetry run python -m protein_stability.predict \
+  infer.input_csv=data/test.csv \
+  infer.output_csv=outputs/preds.csv
 ```
 
 #### Поддерживаемые форматы данных
@@ -142,7 +160,7 @@ M K V L W A A L L V T F L A G C Q A K V E, M K V L W A A L L V T F L A G C Q A K
 
 README покрывает:
 
-- установку окружения (Poetry, DVC, MLflow),
+- установку окружения (Poetry, pre-commit, DVC, MLflow),
 - запуск обучения и предсказаний,
 - использование DVC для управления данными и моделями,
 - подготовку артефактов для продакшена,
