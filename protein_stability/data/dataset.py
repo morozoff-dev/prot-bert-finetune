@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from protein_stability.helpers import prepare_input
+from protein_stability.utils.helpers import prepare_input
 
 
 def _prepare_positions(series, max_len: int) -> np.ndarray:

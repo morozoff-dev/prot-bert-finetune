@@ -5,9 +5,9 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 
-from protein_stability.losses import RMSELoss
-from protein_stability.model import CustomModel
-from protein_stability.utils import get_score
+from protein_stability.models.losses import RMSELoss
+from protein_stability.models.model import CustomModel
+from protein_stability.utils.utils import get_score
 
 
 class ProteinLightningModule(pl.LightningModule):

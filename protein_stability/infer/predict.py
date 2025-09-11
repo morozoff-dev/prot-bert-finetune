@@ -13,8 +13,8 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from protein_stability.dataset import TestDataset
-from protein_stability.model import CustomModel
+from protein_stability.data.dataset import TestDataset
+from protein_stability.models.model import CustomModel
 
 
 def inference_fn(test_loader, model, device):
@@ -221,7 +221,7 @@ def write_output(
         out.to_csv(cfg.infer.output_csv, index=False)
 
 
-@hydra.main(config_path="../conf", config_name="config", version_base=None)
+@hydra.main(config_path="../../conf", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     # 1) подготовить датафрейм
     df, is_kaggle = prepare_dataframe(cfg)

@@ -13,11 +13,11 @@ from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import MLFlowLogger
 
-from protein_stability.callbacks import PlotAndArtifactsCallback
-from protein_stability.pl_datamodule import ProteinDataModule
-from protein_stability.pl_module import ProteinLightningModule
-from protein_stability.preprocessing import add_cv_folds, preprocess_train_data
-from protein_stability.utils import seed_everything
+from protein_stability.data.preprocessing import add_cv_folds, preprocess_train_data
+from protein_stability.train.callbacks import PlotAndArtifactsCallback
+from protein_stability.train.pl_datamodule import ProteinDataModule
+from protein_stability.train.pl_module import ProteinLightningModule
+from protein_stability.utils.utils import seed_everything
 
 
 def _get_git_commit() -> str | None:
@@ -27,7 +27,7 @@ def _get_git_commit() -> str | None:
         return None
 
 
-@hydra.main(config_path="../conf", config_name="config", version_base=None)
+@hydra.main(config_path="../../conf", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     seed_everything(cfg.training.seed)
 
