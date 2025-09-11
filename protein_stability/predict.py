@@ -13,8 +13,8 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.dataset import TestDataset
-from src.model import CustomModel
+from protein_stability.dataset import TestDataset
+from protein_stability.model import CustomModel
 
 
 def inference_fn(test_loader, model, device):

@@ -7,9 +7,9 @@ import pandas as pd
 import wandb
 from omegaconf import DictConfig
 
-from src.preprocessing import add_cv_folds, preprocess_train_data
-from src.trainer import train_loop
-from src.utils import (
+from protein_stability.preprocessing import add_cv_folds, preprocess_train_data
+from protein_stability.trainer import train_loop
+from protein_stability.utils import (
     MetricRecorder,
     get_git_commit,
     get_logger,

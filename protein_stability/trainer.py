@@ -11,11 +11,11 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-from src.dataset import TrainDataset
-from src.helpers import train_fn, valid_fn
-from src.losses import RMSELoss
-from src.model import CustomModel
-from src.utils import get_score
+from protein_stability.dataset import TrainDataset
+from protein_stability.helpers import train_fn, valid_fn
+from protein_stability.losses import RMSELoss
+from protein_stability.model import CustomModel
+from protein_stability.utils import get_score
 
 
 def train_loop(folds, fold, config, logger, mlflow_run=None):

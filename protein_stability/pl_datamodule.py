@@ -6,7 +6,7 @@ from typing import Optional
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
-from src.dataset import TrainDataset  # используй твой класс
+from protein_stability.dataset import TrainDataset  # используй твой класс
 
 # предполагается, что ты уже подготовил train_df с колонкой 'fold' извне
 

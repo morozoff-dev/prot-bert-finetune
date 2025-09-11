@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from src.helpers import prepare_input
+from protein_stability.helpers import prepare_input
 
 
 class TrainDataset(Dataset):

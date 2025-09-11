@@ -13,11 +13,11 @@ from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import MLFlowLogger
 
-from src.callbacks import PlotAndArtifactsCallback
-from src.pl_datamodule import ProteinDataModule
-from src.pl_module import ProteinLightningModule
-from src.preprocessing import add_cv_folds, preprocess_train_data
-from src.utils import seed_everything
+from protein_stability.callbacks import PlotAndArtifactsCallback
+from protein_stability.pl_datamodule import ProteinDataModule
+from protein_stability.pl_module import ProteinLightningModule
+from protein_stability.preprocessing import add_cv_folds, preprocess_train_data
+from protein_stability.utils import seed_everything
 
 
 def _get_git_commit() -> str | None:
