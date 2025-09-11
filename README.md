@@ -51,6 +51,8 @@
    dvc pull -r models   # скачать модели (чекпоинты .ckpt)
    ```
 
+   (Нужно запросить у владельца репозитория gdrive-service.json для авторизации)
+
 5. Запустить MLflow сервер (локально):
    ```bash
    poetry run mlflow server \
@@ -149,5 +151,3 @@ M K V L W A A L L V T F L A G C Q A K V E, M K V L W A A L L V T F L A G C Q A K
 
 - для Kaggle: `seq_id,tm`
 - для свободного формата: `sequence,mutant_seq,position,prediction`
-
----
