@@ -2,7 +2,7 @@
 
 ## Описание проекта
 
-Этот проект посвящён дообучению большой языковой модели для работы с белковыми
+Этот проект посвящён дообучению трансформера для работы с белковыми
 последовательностями (например, Facebook ESM2 / ProtBERT). Задача —
 предсказывать стабильность белковых мутаций (регрессионная задача).
 
@@ -10,9 +10,9 @@
 
 - Предобработка данных (добавление фолдов, подготовка последовательностей,
   генерация позиций).
-- Обучение модели с использованием PyTorch Lightning.
-- Логирование экспериментов и метрик в MLflow.
-- Отслеживание и версионирование артефактов через DVC.
+- Обучение модели с использованием **PyTorch Lightning**.
+- Логирование экспериментов и метрик в **MLflow**.
+- Отслеживание и версионирование артефактов через **DVC**.
 - Предсказание на новых данных в двух режимах:
   - Kaggle-совместимый формат (`protein_sequence`, `seq_id`).
   - Свободный формат (`sequence`, `mutant_seq`, `position`).
@@ -20,6 +20,33 @@
 ---
 
 ## Технические детали
+
+### Структура проекта (важные модули)
+
+```
+protein_stability/
+  data/
+    dataset.py           # TrainDataset / TestDataset
+    preprocessing.py     # функции подготовки данных и разбиения на фолды
+  models/
+    model.py             # CustomModel
+    losses.py            # RMSELoss и др.
+  train/
+    train_pl.py          # точка входа обучения (Lightning)
+    pl_module.py
+    pl_datamodule.py
+    callbacks.py
+  infer/
+    predict.py           # точка входа инференса
+  utils/
+    helpers.py           # prepare_input и пр.
+    utils.py             # seed_everything, get_score, логгеры и т.д.
+conf/
+outputs/
+plots/
+```
+
+---
 
 ### Setup
 
@@ -36,24 +63,26 @@
    poetry install
    ```
 
-3. Настроить **pre-commit** (чтобы автоматически проверять стиль кода):
+3. Настроить **pre-commit** (автопроверка стиля):
 
    ```bash
    poetry run pre-commit install
-   # проверить все файлы один раз вручную
+   # по желанию — проверить все файлы сразу
    poetry run pre-commit run -a
    ```
 
-4. Настроить DVC и подтянуть данные и модели:
+4. Настроить **DVC** и подтянуть данные и модели:
 
    ```bash
    dvc pull -r data     # скачать датасеты
    dvc pull -r models   # скачать модели (чекпоинты .ckpt)
    ```
 
-   (Нужно запросить у владельца репозитория gdrive-service.json для авторизации)
+   > Для удалённого Google Drive потребуется `./.dvc/gdrive-service.json`.
+   > Попросите файл у владельца репозитория и положите его по указанному пути.
 
-5. Запустить MLflow сервер (локально):
+5. Запустить **MLflow** сервер (локально):
+
    ```bash
    poetry run mlflow server \
      --backend-store-uri sqlite:///mlflow.db \
@@ -65,22 +94,22 @@
 
 ### Train
 
-Обучение модели запускается через PyTorch Lightning:
+Запуск обучения через **PyTorch Lightning**:
 
 ```bash
-poetry run python -m protein_stability.train_pl
+poetry run python -m protein_stability.train.train_pl
 ```
 
-Полезные параметры:
+Полезные параметры (Hydra):
 
 - `debug.fast_debug=true` — отладочный режим.
 - `training.trn_fold="[0,1,2,3,4]"` — список фолдов.
 - `logging.mlflow.enable=true` — включить логирование в MLflow.
 
-Пример запуска:
+Пример запуска с MLflow:
 
 ```bash
-poetry run python -m protein_stability.train_pl \
+poetry run python -m protein_stability.train.train_pl \
   logging.mlflow.enable=true \
   logging.mlflow.tracking_uri=http://127.0.0.1:8080 \
   logging.mlflow.experiment=protein-stability \
@@ -94,9 +123,9 @@ poetry run python -m protein_stability.train_pl \
 <model>_foldN_best.ckpt
 ```
 
-Их удобно версионировать через DVC.
+Их удобно версионировать через **DVC**.
 
-Запушить новые чекпоинты в удалённое хранилище:
+Запушить новые чекпоинты в удалённое хранилище моделей:
 
 ```bash
 dvc add outputs/best/*.ckpt
@@ -111,27 +140,29 @@ dvc push -r models
 
 Для деплоя:
 
-- Использовать лучшие чекпоинты (`outputs/best/*_best.ckpt`).
+- Использовать лучшие чекпоинты: `outputs/best/*_best.ckpt`.
 - Обязательные артефакты:
   - чекпоинты моделей,
   - код (`protein_stability/`),
   - конфиги (`conf/`).
 
+_(Опционально)_ Экспорт в ONNX/другие форматы при необходимости.
+
 ---
 
 ### Infer
 
-Предсказания запускаются через:
+Запуск предсказаний:
 
 ```bash
-poetry run python -m protein_stability.predict \
+poetry run python -m protein_stability.infer.predict \
   infer.input_csv=data/test.csv \
   infer.output_csv=outputs/preds.csv
 ```
 
 #### Поддерживаемые форматы данных
 
-1. Kaggle-совместимый формат:
+1. **Kaggle-совместимый**:
 
 ```csv
 seq_id,protein_sequence
@@ -139,7 +170,7 @@ id1,MKVLWAALLVTFLAGCQAKVE...
 id2,MKVLWAALLVTFLAGCQAKVF...
 ```
 
-2. Свободный формат:
+2. **Свободный формат**:
 
 ```csv
 sequence,mutant_seq,position
@@ -147,7 +178,7 @@ M K V L W A A L L V T F L A G C Q A K V E, M K V L W A A L L V T F L A G C Q A K
 M K V L W A A L L V T F L A G C Q A K V E, M K V L W A A L L V T F L A G C Q A K I E, 45
 ```
 
-Выходной CSV:
+**Выходной CSV**:
 
 - для Kaggle: `seq_id,tm`
 - для свободного формата: `sequence,mutant_seq,position,prediction`
