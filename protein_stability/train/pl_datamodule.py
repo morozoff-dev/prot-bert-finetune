@@ -1,4 +1,3 @@
-# src/pl_datamodule.py
 from __future__ import annotations
 
 from typing import Optional
@@ -6,9 +5,7 @@ from typing import Optional
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
-from protein_stability.data.dataset import TrainDataset  # используй твой класс
-
-# предполагается, что ты уже подготовил train_df с колонкой 'fold' извне
+from protein_stability.data.dataset import TrainDataset
 
 
 class ProteinDataModule(pl.LightningDataModule):
@@ -36,7 +33,7 @@ class ProteinDataModule(pl.LightningDataModule):
         return DataLoader(
             self.ds_train,
             batch_size=self.cfg.training.batch_size,
-            shuffle=not self.cfg.debug.fast_debug,  # для воспроизводимости в debug можно false
+            shuffle=not self.cfg.debug.fast_debug,
             num_workers=self.cfg.model.num_workers,
             pin_memory=True,
             drop_last=True,

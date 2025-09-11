@@ -1,4 +1,3 @@
-# src/train_pl.py
 from __future__ import annotations
 
 import glob
@@ -44,7 +43,6 @@ def main(cfg: DictConfig):
         verbose=False,
     )
 
-    # === MLflow-логер
     mlf_logger = None
     if getattr(cfg.logging.mlflow, "enable", False) and getattr(
         cfg.logging.mlflow, "tracking_uri", None
@@ -81,11 +79,9 @@ def main(cfg: DictConfig):
             except Exception:
                 pass
 
-    # === директория чекпоинтов
     ckpt_dir = os.path.join(get_original_cwd(), cfg.model.model_weights_path)
     os.makedirs(ckpt_dir, exist_ok=True)
 
-    # === базовый чекпоинтер Lightning
     # сохраняем лучший по val_loss (save_top_k=1), без автоматического добавления метрик в имя
     checkpoint_cb = ModelCheckpoint(
         dirpath=ckpt_dir,
@@ -162,10 +158,6 @@ def main(cfg: DictConfig):
                         os.remove(p)
                     except OSError:
                         pass
-
-    # На этом этапе в outputs/best/ будут лежать ровно:
-    #   <model>_foldN_best.ckpt  — по одному на каждый фолд (перезаписываются между запусками)
-    # Их удобно трекать в DVC.
 
 
 if __name__ == "__main__":

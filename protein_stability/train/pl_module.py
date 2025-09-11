@@ -1,4 +1,3 @@
-# src/pl_module.py
 from __future__ import annotations
 
 import numpy as np
@@ -108,7 +107,6 @@ class ProteinLightningModule(pl.LightningModule):
         self.log(
             "train_loss", loss, on_step=True, on_epoch=True, prog_bar=False, logger=True
         )
-        # self.log("train_loss_epoch", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
         # лог LR (по шагам)
         try:

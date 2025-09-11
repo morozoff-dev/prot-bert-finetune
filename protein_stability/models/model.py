@@ -32,11 +32,9 @@ class CustomModel(nn.Module):
             self.config.hidden_dropout_prob = 0.0
             self.config.attention_dropout = 0.0
             self.config.attention_probs_dropout_prob = 0.0
-            # logger.info(self.config)
         else:
             add_safe_globals([EsmConfig])
             self.config = torch.load(config_path, weights_only=False)
-            # self.config = AutoConfig.from_pretrained(config_path)
         if pretrained:
             self.model = AutoModel.from_pretrained(cfg.model.model, config=self.config)
         else:

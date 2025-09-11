@@ -71,10 +71,8 @@ def train_fn(
     start = time.time()
     global_step = 0
     for step, (inputs1, inputs2, position, labels) in enumerate(train_loader):
-        # inputs1 = collate(inputs1)
         for k, v in inputs1.items():
             inputs1[k] = v.to(device)
-        # inputs2 = collate(inputs2)
         for k, v in inputs2.items():
             inputs2[k] = v.to(device)
         position = position.to(device)
@@ -162,15 +160,9 @@ def valid_fn(valid_loader, model, criterion, device, cfg):
 
             bs = labels.size(0)
 
-            # forward + loss
             y_preds = model(inputs1, inputs2, position)
             loss = criterion(y_preds, labels)
             loss_value = float(loss.detach().item())
-
-            # Валидация не нуждается в делении на gradient_accumulation_steps,
-            # но если хочешь сохранить семантику — оставь строку ниже закомментированной:
-            # if cfg.training.gradient_accumulation_steps > 1:
-            #     loss_value /= cfg.training.gradient_accumulation_steps
 
             losses.update(loss_value, bs)
             preds.append(y_preds.detach().cpu().numpy())
@@ -190,21 +182,17 @@ def valid_fn(valid_loader, model, criterion, device, cfg):
                     )
                 )
 
-            # ранний выход в debug-режиме
             if getattr(cfg.debug, "fast_debug", False) and (step + 1) >= getattr(
                 cfg.debug, "debug_val_steps", 1
             ):
                 print(f"[DEBUG] valid early-exit after {step+1} steps (seen={n_seen})")
                 break
 
-    # аккуратно склеиваем предсказания
     if preds:
         predictions = np.concatenate(preds, axis=0)
     else:
-        # пустой валид/очень ранний выход: вернём корректной формы пустой массив
         predictions = np.empty((0, n_targets), dtype=np.float32)
 
-    # средний лосс: если не было батчей — вернём NaN (train_loop это учтёт)
     avg_val_loss = (
         float(losses.avg) if getattr(losses, "count", 0) > 0 else float("nan")
     )

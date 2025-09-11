@@ -1,4 +1,3 @@
-# src/predict.py
 from __future__ import annotations
 
 import gc
@@ -50,7 +49,7 @@ def first_diff_pos(wt: str, mut: str) -> int:
     L = min(len(s), len(m))
     while i < L and s[i] == m[i]:
         i += 1
-    return i + 1  # 1-based
+    return i + 1
 
 
 def ensure_positions(df: pd.DataFrame) -> pd.DataFrame:
@@ -139,7 +138,6 @@ def _load_weights_into_model(model: torch.nn.Module, ckpt_path: str):
     state = torch.load(ckpt_path, map_location="cpu", weights_only=False)
 
     if isinstance(state, dict) and "state_dict" in state:
-        # Lightning checkpoint: вытащим только веса self.model.* и снимем префикс 'model.'
         pl_sd = state["state_dict"]
         cleaned = {}
         for k, v in pl_sd.items():
@@ -147,10 +145,8 @@ def _load_weights_into_model(model: torch.nn.Module, ckpt_path: str):
                 cleaned[k[len("model.") :]] = v
         model.load_state_dict(cleaned, strict=False)
     elif isinstance(state, dict) and "model" in state:
-        # Старый формат
         model.load_state_dict(state["model"], strict=True)
     else:
-        # На всякий случай — пробуем загрузить как есть
         model.load_state_dict(state, strict=False)
 
 
