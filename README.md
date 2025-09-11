@@ -110,10 +110,6 @@ dvc push -r models
 Для деплоя:
 
 - Использовать лучшие чекпоинты (`outputs/best/*_best.ckpt`).
-- При необходимости — перевести модель в ONNX:
-  ```bash
-  torch.onnx.export(...)
-  ```
 - Обязательные артефакты:
   - чекпоинты моделей,
   - код (`protein_stability/`),
@@ -155,13 +151,3 @@ M K V L W A A L L V T F L A G C Q A K V E, M K V L W A A L L V T F L A G C Q A K
 - для свободного формата: `sequence,mutant_seq,position,prediction`
 
 ---
-
-## Итог
-
-README покрывает:
-
-- установку окружения (Poetry, pre-commit, DVC, MLflow),
-- запуск обучения и предсказаний,
-- использование DVC для управления данными и моделями,
-- подготовку артефактов для продакшена,
-- примеры входных/выходных данных.

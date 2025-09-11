@@ -188,7 +188,7 @@ def load_and_predict(cfg: DictConfig, df: pd.DataFrame, folds: List[int]) -> np.
     preds_folds = []
 
     for fold in folds:
-        model = CustomModel(cfg, config_path=cfg.model.config_path, pretrained=False)
+        model = CustomModel(cfg, config_path=None, pretrained=False)
 
         ckpt_path = _resolve_ckpt_path(checkpoint_dir, base_name, fold)
         _load_weights_into_model(model, ckpt_path)
