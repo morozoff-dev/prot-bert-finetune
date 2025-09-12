@@ -11,6 +11,9 @@ tm) критически важна для промышленного приме
 эффективность биотехнологических процессов (например, в производстве биоэтанола
 или моющих средств).
 
+https://www.kaggle.com/competitions/novozymes-enzyme-stability-prediction
+https://www.kaggle.com/code/cdeotte/prot-bert-finetune-lb-0-30/notebook
+
 Основные возможности и этапы:
 
 - Предобработка данных (добавление фолдов, подготовка последовательностей,
